@@ -1,1 +1,12 @@
+# Python tự sinh
+__pycache__/
+*.pyc
 
+# Database SQLite (mỗi người dùng database riêng trên máy)
+data/*.db
+
+# File hệ điều hành / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
