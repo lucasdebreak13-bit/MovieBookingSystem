@@ -104,7 +104,22 @@ The team will agree on how to divide shared features such as movie search, sorti
 The team plans to test valid and invalid inputs, movie and showtime data, booking seat counts, and file saving/loading. Integration testing will be completed before submission.
 
 ## 9. Course information
-
+## Coding conventions
+| Item | Rule | Example |
+|---|---|---|
+| Language | All names, messages and comments in English | `calculate_total()` |
+| Class names | PascalCase | `Movie`, `Showtime`, `Booking`, `CinemaManager` |
+| Functions / variables | snake_case | `get_available_seats()`, `ticket_price` |
+| Movie ID | `M` + 2 digits | `M01` |
+| Showtime ID | `S` + 2 digits | `S01` |
+| Booking ID | `B` + 3 digits | `B001` |
+| Seat code | Row letter A–E + number 1–10 | `A1`, `E10` |
+| Room | `R` + number | `R1` |
+| Date | `YYYY-MM-DD` (string) | `2026-10-25` |
+| Time | `HH:MM`, 24-hour | `19:30` |
+| Money | VND, stored as `float`, displayed with commas | `80,000 VND` |
+| Errors | Classes `raise ValueError`; only `main.py` / `management.py` use `try/except` | |
+| Test code | Put inside `if __name__ == "__main__":` | |
 - **Course:** PFP191 – Programming Fundamentals with Python
 - **Project topic:** Movie Ticket Booking Management System
 - **Type:** Group assignment (4 members)
