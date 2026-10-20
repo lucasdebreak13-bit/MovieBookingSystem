@@ -1,11 +1,4 @@
-"""
-database.py - Lớp lưu trữ dữ liệu bằng SQLite cho Movie Ticket Booking System.
 
-- sqlite3 có sẵn trong Python, KHÔNG cần pip install (chạy được ngay trong Thonny).
-- Toàn bộ dữ liệu nằm trong 1 file: data/cinema.db
-- Các module khác (movie.py, showtime.py, booking.py, main.py) chỉ gọi
-  các hàm trong file này, không tự viết SQL.
-"""
 import os
 import sqlite3
 

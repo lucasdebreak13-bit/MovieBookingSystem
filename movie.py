@@ -121,7 +121,7 @@ class Movie:
         return f'{self.movie_id} - {self.title} - {self.genre} - {self.ticket_price:,.0f} VND'
 
 
-# SỬA: code test chỉ chạy khi mở trực tiếp file này, KHÔNG chạy khi file khác import
+# SỬA: code test chỉ chạy khi mở trực tiếp file này KHÔNG chạy khi file khác import
 if __name__ == '__main__':
     movies = [
         Movie('M01', 'Avatar 10', 'Sci-fi', 192, 'T13', 'English', 80000.0, 2026),
