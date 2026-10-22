@@ -4,7 +4,7 @@ __pycache__/
 
 # Database SQLite (mỗi người dùng database riêng trên máy)
 data/*.db
-
+data/*.txt
 # File hệ điều hành / editor
 .DS_Store
 Thumbs.db
