@@ -147,6 +147,13 @@ def get_showtime(showtime_id):
         ).fetchone()
 
 
+def delete_showtime(showtime_id):
+    """Không cho xoá suất chiếu đã có người đặt (khoá ngoại sẽ báo lỗi)."""
+    with get_connection() as conn:
+        cur = conn.execute("DELETE FROM showtimes WHERE showtime_id = ?", (showtime_id,))
+        return cur.rowcount == 1
+
+
 def all_seat_codes():
     return [f"{r}{c}" for r in SEAT_ROWS for c in range(1, SEATS_PER_ROW + 1)]
 
@@ -209,6 +216,45 @@ def get_booking(booking_id):
         return b, seats
 
 
+def get_all_bookings():
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT b.*, m.title, s.show_date, s.show_time
+            FROM bookings b
+            JOIN showtimes s ON s.showtime_id = b.showtime_id
+            JOIN movies m    ON m.movie_id = s.movie_id
+            ORDER BY b.booking_id
+        """).fetchall()
+
+
+def change_booking_seats(booking_id, new_seats):
+    """
+    Đổi ghế / đổi số lượng vé của 1 booking đang Active.
+    Dùng TRANSACTION: lỗi thì giữ nguyên ghế cũ. Trả về tổng tiền mới.
+    """
+    conn = get_connection()
+    try:
+        b = conn.execute("SELECT * FROM bookings WHERE booking_id = ? AND status = 'Active'",
+                         (booking_id,)).fetchone()
+        if b is None:
+            raise ValueError("Booking not found or already cancelled")
+        price = conn.execute("SELECT ticket_price FROM showtimes WHERE showtime_id = ?",
+                             (b["showtime_id"],)).fetchone()["ticket_price"]
+        conn.execute("DELETE FROM booking_seats WHERE booking_id = ?", (booking_id,))
+        for seat in new_seats:
+            conn.execute("INSERT INTO booking_seats VALUES (?, ?, ?)",
+                         (booking_id, b["showtime_id"], seat))
+        total = price * len(new_seats)
+        conn.execute("UPDATE bookings SET total_price = ? WHERE booking_id = ?", (total, booking_id))
+        conn.commit()
+        return total
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        raise ValueError("Some seats are already taken by another booking")
+    finally:
+        conn.close()
+
+
 def cancel_booking(booking_id):
     """Huỷ vé: đổi trạng thái + xoá ghế -> ghế được trả lại tự động."""
     with get_connection() as conn:
@@ -217,6 +263,20 @@ def cancel_booking(booking_id):
             "WHERE booking_id=? AND status='Active'", (booking_id,))
         conn.execute("DELETE FROM booking_seats WHERE booking_id = ?", (booking_id,))
         return cur.rowcount == 1
+
+
+# ============================= UTILS ================================
+
+def next_id(table, column, prefix, width):
+    """Sinh mã tiếp theo, vd next_id('bookings', 'booking_id', 'B', 3) -> 'B004'."""
+    allowed = {("movies", "movie_id"), ("showtimes", "showtime_id"), ("bookings", "booking_id")}
+    if (table, column) not in allowed:
+        raise ValueError("Invalid table/column")
+    with get_connection() as conn:
+        rows = conn.execute(f"SELECT {column} FROM {table}").fetchall()
+    numbers = [int(r[0][len(prefix):]) for r in rows
+               if r[0].startswith(prefix) and r[0][len(prefix):].isdigit()]
+    return f"{prefix}{max(numbers, default=0) + 1:0{width}d}"
 
 
 # ============================= REPORT ===============================

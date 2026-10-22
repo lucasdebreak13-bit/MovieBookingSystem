@@ -47,38 +47,41 @@ The required movie fields are `movie_id`, `title`, `genre`, `duration`, and `tic
 - **Code editor:** Thonny
 - **Version control:** Git and GitHub
 - **Interface:** Command-line interface (CLI)
-- **Data storage:** Text files (`.txt`)
+- **Data storage:** SQLite (`data/cinema.db`, built into Python, no install needed); data can be exported to text files (`.txt`)
 
-## 4. Planned project structure
+## 4. Project structure
 
 ```text
 MovieBookingSystem/
-├── movie.py
-├── showtime.py
-├── booking.py
-├── management.py
-├── main.py
-├── data/
-│   ├── movies.txt
-│   ├── showtimes.txt
-│   └── bookings.txt
-├── tests/
-│   └── test_movie.py
+├── main.py          # Text menu (input/print only)
+├── management.py    # CinemaManager: business rules, connects all modules
+├── movie.py         # Movie class + validation
+├── showtime.py      # Showtime class + validation
+├── booking.py       # Booking class + validation
+├── database.py      # All SQL queries (SQLite)
+├── seed_data.py     # Sample data for demo
+├── data/            # Created automatically (ignored by Git)
+│   ├── cinema.db
+│   └── movies.txt, showtimes.txt, bookings.txt   (after export)
 ├── README.md
 └── .gitignore
 ```
 
-*This structure may change as the team integrates the modules.*
+```text
+main.py  ->  management.py  ->  database.py  ->  data/cinema.db
+                 |
+     movie.py / showtime.py / booking.py  (validate data before saving)
+```
 
-## 5. How to run (when integration is complete)
+## 5. How to run
 
 1. Install Python 3 and Thonny.
-2. Download the repository or clone it from GitHub.
-3. Open the project folder and open `main.py` in Thonny.
-4. Press **F5 (Run)**.
+2. Clone the repository with GitHub Desktop (or download ZIP).
+3. Open `seed_data.py` in Thonny and press **F5** once to load sample data.
+4. Open `main.py` and press **F5 (Run)**.
 5. Use the menu in the Shell to choose a function.
 
-> While `main.py` is not available, individual modules can be tested separately in Thonny.
+Each class file (`movie.py`, `showtime.py`, `booking.py`) can also be run alone to see its own tests.
 
 ## 6. Team responsibilities
 
