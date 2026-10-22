@@ -1,19 +1,15 @@
-"""
-management.py - "Bộ não" của hệ thống.
 
-Nhiệm vụ: kiểm tra LUẬT NGHIỆP VỤ (liên quan nhiều bảng) rồi gọi database.py.
-- Không input(), không print()  -> việc đó của main.py
-- Không viết SQL                 -> việc đó của database.py
-- Lỗi thì raise ValueError       -> main.py sẽ try/except và in ra
-"""
 import os
 import sqlite3
-from datetime import date
+from datetime import date, datetime, timedelta
 
 import database as db
 from movie import Movie
 from showtime import Showtime
 from booking import Booking
+
+
+CLEANING_MINUTES = 15   # thời gian dọn phòng giữa 2 suất chiếu
 
 
 class CinemaManager:
@@ -55,7 +51,7 @@ class CinemaManager:
 
     @staticmethod
     def row_to_movie(row):
-        """Chuyển 1 dòng trong database thành object Movie (để sửa phim)."""
+        """chuyển 1 dòng trong database thành object movie (để sửa phim)."""
         return Movie(row['movie_id'], row['title'], row['genre'], row['duration'],
                      row['age_rating'], row['language'], row['ticket_price'],
                      row['release_year'], row['status'])
@@ -75,16 +71,39 @@ class CinemaManager:
         return db.next_id('showtimes', 'showtime_id', 'S', 2)
 
     def find_movie_for_showtime(self, movie_id):
-        """Phim phải tồn tại và chưa 'Ended' thì mới tạo suất chiếu được."""
+        """phim phải tồn tại và chưa 'Ended' thì mới tạo suất chiếu được."""
         movie = self.find_movie(movie_id)
         if movie['status'] == 'Ended':
             raise ValueError('Cannot create showtime for an ended movie')
         return movie
 
+    @staticmethod
+    def _start_end(show_date, show_time, duration):
+        """tính giờ bắt đầu và giờ phòng trống lại (hết phim + dọn phòng)."""
+        start = datetime.strptime(f'{show_date} {show_time}', '%Y-%m-%d %H:%M')
+        end = start + timedelta(minutes=duration + CLEANING_MINUTES)
+        return start, end
+
     def add_showtime(self, showtime):
-        self.find_movie_for_showtime(showtime.movie_id)
+        movie = self.find_movie_for_showtime(showtime.movie_id)
         if db.get_showtime(showtime.showtime_id) is not None:
             raise ValueError(f'Showtime ID {showtime.showtime_id} already exists')
+
+        new_start, new_end = self._start_end(showtime.show_date, showtime.show_time,
+                                             movie['duration'])
+        # không tạo suất chiếu trong quá khứ
+        if new_start <= datetime.now():
+            raise ValueError('Cannot create a showtime in the past')
+
+        # không trùng lịch trong cùng phòng (tính cả thời lượng phim + dọn phòng)
+        for other in db.get_showtimes_in_room(showtime.room):
+            old_start, old_end = self._start_end(other['show_date'], other['show_time'],
+                                                 other['duration'])
+            if new_start < old_end and old_start < new_end:   # 2 khoảng thời gian giao nhau
+                raise ValueError(
+                    f"Room {showtime.room} is busy: {other['showtime_id']} "
+                    f"({other['title']}) runs {old_start:%Y-%m-%d %H:%M} - {old_end:%H:%M} "
+                    f"(incl. {CLEANING_MINUTES} min cleaning)")
         try:
             db.add_showtime(showtime)
         except sqlite3.IntegrityError:
@@ -103,7 +122,7 @@ class CinemaManager:
         return db.get_available_seats(showtime_id.strip().upper())
 
     def get_seat_map(self, showtime_id):
-        """Trả về list các dòng chữ của sơ đồ ghế, ghế đã đặt là [ X ]."""
+        """trả về list các dòng chữ của sơ đồ ghế, ghế đã đặt là [ X ]."""
         st = self.find_showtime(showtime_id)
         booked = db.get_booked_seats(st['showtime_id'])
         lines = ['=' * 25 + ' SCREEN ' + '=' * 26]
@@ -121,7 +140,7 @@ class CinemaManager:
     # ============================== BOOKING ============================
 
     def book_tickets(self, showtime_id, customer_name, phone, seats):
-        """Trả về (booking_id, total)."""
+        """trả về (booking_id, total)."""
         st = self.find_showtime(showtime_id)
         booking = Booking(db.next_id('bookings', 'booking_id', 'B', 3),
                           st['showtime_id'], customer_name, phone, seats)
@@ -144,7 +163,7 @@ class CinemaManager:
 
     def change_seats(self, booking_id, new_seats):
         row, _ = self.get_booking(booking_id)
-        # Dùng Booking để kiểm tra danh sách ghế mới hợp lệ
+        # dùng booking để kiểm tra danh sách ghế mới hợp lệ
         checked = Booking(row['booking_id'], row['showtime_id'],
                           row['customer_name'], row['phone'], new_seats)
         return db.change_booking_seats(checked.booking_id, checked.seats)
@@ -157,6 +176,43 @@ class CinemaManager:
 
     def revenue_report(self):
         return db.revenue_by_movie()
+
+    def import_movies_from_text(self, path):
+        """
+        đọc phim từ file .txt (cùng định dạng với file export):
+            dòng 1: movie_id|title|genre|duration|age_rating|language|ticket_price|release_year|status
+            các dòng sau: M01|Avatar 10|Sci-fi|192|T13|English|80000|2026|Now Showing
+        mỗi dòng đi qua class Movie để kiểm tra trả về (added, skipped, errors).
+        """
+        if not os.path.exists(path):
+            raise ValueError(f'File not found: {path}')
+        added, skipped, errors = [], [], []
+        with open(path, 'r', encoding='utf-8') as f:
+            lines = f.read().splitlines()
+        for number, line in enumerate(lines, start=1):
+            line = line.strip()
+            if line == '' or line.startswith('movie_id'):   # bỏ dòng trống và dòng tiêu đề
+                continue
+            parts = [p.strip() for p in line.split('|')]
+            try:
+                if len(parts) != 9:
+                    raise ValueError(f'expected 9 fields, got {len(parts)}')
+                try:
+                    duration = int(parts[3])
+                    price = float(parts[6])
+                    year = int(parts[7])
+                except ValueError:
+                    raise ValueError('duration, ticket_price and release_year must be numbers')
+                movie = Movie(parts[0], parts[1], parts[2], duration, parts[4],
+                              parts[5], price, year, parts[8])
+                if db.get_movie(movie.movie_id) is not None:
+                    skipped.append(movie.movie_id)
+                    continue
+                db.add_movie(movie)
+                added.append(movie.movie_id)
+            except ValueError as e:      # int()/float() sai hoặc Movie báo lỗi
+                errors.append(f'Line {number}: {e}')
+        return added, skipped, errors
 
     def export_to_text(self, folder=None):
         """Xuất 3 bảng ra file .txt (đáp ứng yêu cầu đọc/ghi file của môn học)."""

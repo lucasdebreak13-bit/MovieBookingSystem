@@ -9,7 +9,7 @@ SEATS_PER_ROW = 10      # mỗi hàng 10 ghế -> A1..E10
 
 
 def get_connection():
-    """Mở kết nối tới file database (tự tạo thư mục data/ nếu chưa có)."""
+    """mở kết nối tới file database (tự tạo data nếu chưa có)"""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row          # truy cập cột bằng tên: row["title"]
@@ -18,7 +18,7 @@ def get_connection():
 
 
 def init_db():
-    """Tạo 4 bảng nếu chưa tồn tại. Gọi 1 lần khi chương trình khởi động."""
+    """tạo 4 bảng nếu chưa tồn tại gọi 1 lần khi chương trình khởi động"""
     with get_connection() as conn:
         conn.executescript("""
         CREATE TABLE IF NOT EXISTS movies (
@@ -53,8 +53,8 @@ def init_db():
             status        TEXT NOT NULL DEFAULT 'Active'   -- Active / Cancelled
         );
 
-        -- Mỗi dòng = 1 ghế của 1 booking.
-        -- UNIQUE(showtime_id, seat_code): database tự chặn đặt trùng ghế.
+        -- mỗi dòng = 1 ghế của 1 booking.
+        -- UNIQUE(showtime_id, seat_code): database tự chặn đặt trùng ghế
         CREATE TABLE IF NOT EXISTS booking_seats (
             booking_id  TEXT NOT NULL REFERENCES bookings(booking_id) ON DELETE CASCADE,
             showtime_id TEXT NOT NULL REFERENCES showtimes(showtime_id),
@@ -67,7 +67,7 @@ def init_db():
 # ============================== MOVIES ==============================
 
 def add_movie(m):
-    """m là object Movie. Báo lỗi nếu trùng movie_id."""
+    """m là object Movie báo lỗi nếu trùng movie_id"""
     with get_connection() as conn:
         conn.execute(
             "INSERT INTO movies VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -90,7 +90,7 @@ def get_movie(movie_id):
 
 
 def search_movies(keyword):
-    """Tìm theo tên HOẶC thể loại, không phân biệt hoa thường."""
+    """tìm theo tên or thể loại không phân biệt hoa thường"""
     like = f"%{keyword}%"
     with get_connection() as conn:
         return conn.execute(
@@ -106,11 +106,11 @@ def update_movie(m):
             (m.title, m.genre, m.duration, m.age_rating, m.language,
              m.ticket_price, m.release_year, m.status, m.movie_id),
         )
-        return cur.rowcount == 1   # True nếu có phim để sửa
+        return cur.rowcount == 1   # true nếu có phim để sửa
 
 
 def delete_movie(movie_id):
-    """Không cho xoá phim đã có suất chiếu (khoá ngoại sẽ báo lỗi)."""
+    """không cho xoá phim đã có suất chiếu (khoá ngoại sẽ báo lỗi)"""
     with get_connection() as conn:
         cur = conn.execute("DELETE FROM movies WHERE movie_id = ?", (movie_id,))
         return cur.rowcount == 1
@@ -119,7 +119,7 @@ def delete_movie(movie_id):
 # ============================= SHOWTIMES ============================
 
 def add_showtime(s):
-    """s là object Showtime (có movie_id, KHÔNG lưu title)."""
+    """s là object Showtime (có movie_id KHÔNG lưu title)"""
     with get_connection() as conn:
         conn.execute(
             "INSERT INTO showtimes VALUES (?, ?, ?, ?, ?, ?)",
@@ -128,7 +128,7 @@ def add_showtime(s):
 
 
 def get_showtimes(movie_id=None):
-    """Lấy suất chiếu kèm tên phim (JOIN). Có thể lọc theo phim."""
+    """lấy suất chiếu kèm tên phim (JOIN) có thể lọc theo phim"""
     sql = """SELECT s.*, m.title FROM showtimes s
              JOIN movies m ON m.movie_id = s.movie_id"""
     params = ()
@@ -147,8 +147,18 @@ def get_showtime(showtime_id):
         ).fetchone()
 
 
+def get_showtimes_in_room(room):
+    """các suất chiếu của 1 phòng, kèm thời lượng phim (để kiểm tra trùng lịch)"""
+    with get_connection() as conn:
+        return conn.execute("""
+            SELECT s.*, m.title, m.duration FROM showtimes s
+            JOIN movies m ON m.movie_id = s.movie_id
+            WHERE s.room = ?
+        """, (room,)).fetchall()
+
+
 def delete_showtime(showtime_id):
-    """Không cho xoá suất chiếu đã có người đặt (khoá ngoại sẽ báo lỗi)."""
+    """không cho xoá suất chiếu đã có người đặt (khoá ngoại sẽ báo lỗi)"""
     with get_connection() as conn:
         cur = conn.execute("DELETE FROM showtimes WHERE showtime_id = ?", (showtime_id,))
         return cur.rowcount == 1

@@ -1,7 +1,9 @@
 """
-seed_data.py - Nạp dữ liệu mẫu để demo. Chạy 1 lần bằng F5 trong Thonny.
-Chạy lại nhiều lần cũng không sao: dữ liệu đã có thì bỏ qua.
+seed_data.py - nạp dữ liệu mẫu để demo
+chạy lại nhiều lần cũng không sao dữ liệu đã có thì bỏ qua
 """
+from datetime import date, timedelta
+
 from management import CinemaManager
 from movie import Movie
 from showtime import Showtime
@@ -16,11 +18,15 @@ sample_movies = [
     Movie('M05', 'The Conjuring1', 'Horror', 112, 'K', 'Japanese', 99000.0, 2026),
 ]
 
+# ngày chiếu tính từ hôm nay -> chạy lúc nào cũng là suất chiếu tương lai
+day1 = str(date.today() + timedelta(days=3))   # 3 ngày nữa dạng YYYY-MM-DD
+day2 = str(date.today() + timedelta(days=4))
+
 sample_showtimes = [
-    Showtime('S01', 'M01', 'R1', '2026-10-25', '19:30', 80000),
-    Showtime('S02', 'M01', 'R2', '2026-10-25', '21:00', 90000),
-    Showtime('S03', 'M03', 'R1', '2026-10-26', '18:00', 96000),
-    Showtime('S04', 'M05', 'R3', '2026-10-26', '22:00', 99000),
+    Showtime('S01', 'M01', 'R1', day1, '19:30', 80000),
+    Showtime('S02', 'M01', 'R2', day1, '21:00', 90000),
+    Showtime('S03', 'M03', 'R1', day2, '18:00', 96000),
+    Showtime('S04', 'M05', 'R3', day2, '22:00', 99000),
 ]
 
 for m in sample_movies:

@@ -47,7 +47,7 @@ class Booking:
     @phone.setter
     def phone(self, value):
         value = self._check_text(value, 'Phone')
-        # Số điện thoại VN: 10 chữ số, bắt đầu bằng 0
+        # sdt VN 10 chữ số bắt đầu bằng 0
         if not value.isdigit() or len(value) != 10 or value[0] != '0':
             raise ValueError('Phone must be 10 digits and start with 0')
         self._phone = value
@@ -58,7 +58,7 @@ class Booking:
 
     @seats.setter
     def seats(self, value):
-        """value có thể là list ['A1', 'A2'] hoặc chuỗi 'A1, a2'."""
+        """value có thể là list ['A1', 'A2'] hoặc chuỗi 'A1, a2'"""
         if isinstance(value, str):
             value = value.split(',')
         seats = []

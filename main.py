@@ -1,8 +1,6 @@
-"""
-main.py - Giao diện dòng lệnh (menu). Chạy file này bằng F5 trong Thonny.
 
-Chỉ lo input() và print(). Mọi xử lý gọi qua CinemaManager (management.py).
-"""
+import os
+
 from management import CinemaManager
 from movie import Movie, VALID_RATINGS, VALID_STATUS
 from showtime import Showtime
@@ -13,11 +11,15 @@ manager = CinemaManager()
 # ============================ INPUT HELPERS ============================
 
 def input_text(prompt, default=None):
-    """Nhập chuỗi. Có default thì Enter để giữ giá trị cũ."""
+    """nhập chuỗi có default thì enter để giữ giá trị cũ"""
     if default is not None:
         value = input(f'{prompt} [{default}]: ').strip()
         return value if value else str(default)
-    return input(f'{prompt}: ').strip()
+    while True:
+        value = input(f'{prompt}: ').strip()
+        if value:
+            return value
+        print('  -> This field cannot be empty.')
 
 
 def input_int(prompt, default=None):
@@ -299,6 +301,22 @@ def menu_report():
     pause()
 
 
+def import_movies():
+    default_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'movies.txt')
+    path = input_text('File path', default_path)
+    try:
+        added, skipped, errors = manager.import_movies_from_text(path)
+    except ValueError as e:
+        print('Error:', e)
+    else:
+        print(f'Added  : {len(added)} {added}')
+        print(f'Skipped: {len(skipped)} (ID already exists) {skipped}')
+        print(f'Errors : {len(errors)}')
+        for err in errors:
+            print('   ', err)
+    pause()
+
+
 # ================================= MAIN ================================
 
 def main():
@@ -309,6 +327,7 @@ def main():
         print('3. Bookings')
         print('4. Revenue report')
         print('5. Export data to text files')
+        print('6. Import movies from text file')
         print('0. Exit')
         choice = input('Choose: ').strip()
         if choice == '1':
@@ -323,6 +342,8 @@ def main():
             for path in manager.export_to_text():
                 print('Saved:', path)
             pause()
+        elif choice == '6':
+            import_movies()
         elif choice == '0':
             print('Goodbye!')
             break

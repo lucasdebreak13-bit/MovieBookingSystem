@@ -3,7 +3,7 @@ from datetime import datetime
 
 class Showtime:
     def __init__(self, showtime_id, movie_id, room, show_date, show_time, ticket_price):
-        # Gán qua setter -> mỗi thuộc tính được kiểm tra ở property bên dưới
+        # gán qua setter -> mỗi thuộc tính được kiểm tra ở property bên dưới
         self.showtime_id = showtime_id
         self.movie_id = movie_id
         self.room = room
@@ -62,7 +62,7 @@ class Showtime:
     def show_time(self, value):
         value = self._check_text(value, 'Time')
         try:
-            datetime.strptime(value, '%H:%M')      # quy ước: HH:MM, 24 giờ
+            datetime.strptime(value, '%H:%M')      # quy ước: HH:MM 24 giờ
         except ValueError:
             raise ValueError('Time must be in format HH:MM (e.g. 19:30)')
         self._show_time = value
