@@ -3,7 +3,6 @@ seed_data.py - nạp dữ liệu mẫu để demo
 chạy lại nhiều lần cũng không sao dữ liệu đã có thì bỏ qua
 """
 from datetime import date, timedelta
-
 from management import CinemaManager
 from movie import Movie
 from showtime import Showtime

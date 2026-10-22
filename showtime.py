@@ -1,6 +1,5 @@
 from datetime import datetime
 
-
 class Showtime:
     def __init__(self, showtime_id, movie_id, room, show_date, show_time, ticket_price):
         # gán qua setter -> mỗi thuộc tính được kiểm tra ở property bên dưới

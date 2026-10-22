@@ -51,7 +51,7 @@ class CinemaManager:
 
     @staticmethod
     def row_to_movie(row):
-        """chuyển 1 dòng trong database thành object movie (để sửa phim)."""
+        """chuyển 1 dòng trong database thành object movie (để sửa phim)"""
         return Movie(row['movie_id'], row['title'], row['genre'], row['duration'],
                      row['age_rating'], row['language'], row['ticket_price'],
                      row['release_year'], row['status'])
@@ -71,7 +71,7 @@ class CinemaManager:
         return db.next_id('showtimes', 'showtime_id', 'S', 2)
 
     def find_movie_for_showtime(self, movie_id):
-        """phim phải tồn tại và chưa 'Ended' thì mới tạo suất chiếu được."""
+        """phim phải tồn tại và chưa 'Ended' thì mới tạo suất chiếu được"""
         movie = self.find_movie(movie_id)
         if movie['status'] == 'Ended':
             raise ValueError('Cannot create showtime for an ended movie')
@@ -79,7 +79,7 @@ class CinemaManager:
 
     @staticmethod
     def _start_end(show_date, show_time, duration):
-        """tính giờ bắt đầu và giờ phòng trống lại (hết phim + dọn phòng)."""
+        """tính giờ bắt đầu và giờ phòng trống lại (hết phim + dọn phòng)"""
         start = datetime.strptime(f'{show_date} {show_time}', '%Y-%m-%d %H:%M')
         end = start + timedelta(minutes=duration + CLEANING_MINUTES)
         return start, end
@@ -122,7 +122,7 @@ class CinemaManager:
         return db.get_available_seats(showtime_id.strip().upper())
 
     def get_seat_map(self, showtime_id):
-        """trả về list các dòng chữ của sơ đồ ghế, ghế đã đặt là [ X ]."""
+        """trả về list các dòng chữ của sơ đồ ghế, ghế đã đặt là [ X ]"""
         st = self.find_showtime(showtime_id)
         booked = db.get_booked_seats(st['showtime_id'])
         lines = ['=' * 25 + ' SCREEN ' + '=' * 26]
@@ -182,7 +182,7 @@ class CinemaManager:
         đọc phim từ file .txt (cùng định dạng với file export):
             dòng 1: movie_id|title|genre|duration|age_rating|language|ticket_price|release_year|status
             các dòng sau: M01|Avatar 10|Sci-fi|192|T13|English|80000|2026|Now Showing
-        mỗi dòng đi qua class Movie để kiểm tra trả về (added, skipped, errors).
+        mỗi dòng đi qua class Movie để kiểm tra trả về (added, skipped, errors)
         """
         if not os.path.exists(path):
             raise ValueError(f'File not found: {path}')
@@ -215,7 +215,7 @@ class CinemaManager:
         return added, skipped, errors
 
     def export_to_text(self, folder=None):
-        """Xuất 3 bảng ra file .txt (đáp ứng yêu cầu đọc/ghi file của môn học)."""
+        """xuất 3 bảng ra file .txt """
         folder = folder or os.path.dirname(db.DB_PATH)
         os.makedirs(folder, exist_ok=True)
         files = {
