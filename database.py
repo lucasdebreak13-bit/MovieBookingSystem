@@ -8,10 +8,19 @@ SEAT_ROWS = "ABCDE"     # 5 hàng ghế
 SEATS_PER_ROW = 10      # mỗi hàng 10 ghế -> A1..E10
 
 
+class ClosingConnection(sqlite3.Connection):
+    """kết nối tự ĐÓNG sau khối `with` (sqlite3 mặc định chỉ commit, không đóng
+    -> file cinema.db bị giữ, Windows báo "Folder In Use" khi xoá)"""
+    def __exit__(self, exc_type, exc_value, traceback):
+        result = super().__exit__(exc_type, exc_value, traceback)   # commit / rollback
+        self.close()
+        return result
+
+
 def get_connection():
     """mở kết nối tới file database (tự tạo data nếu chưa có)"""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, factory=ClosingConnection)
     conn.row_factory = sqlite3.Row          # truy cập cột bằng tên: row["title"]
     conn.execute("PRAGMA foreign_keys = ON")  # bật kiểm tra khoá ngoại
     return conn
@@ -89,12 +98,17 @@ def get_movie(movie_id):
         return conn.execute("SELECT * FROM movies WHERE movie_id = ?", (movie_id,)).fetchone()
 
 
-def search_movies(keyword):
-    """tìm theo tên or thể loại không phân biệt hoa thường"""
+def search_movies(keyword, field="all"):
+    """tìm theo mã phim / tên / thể loại (hoặc cả 3), không phân biệt hoa thường"""
     like = f"%{keyword}%"
+    columns = {"id": ["movie_id"], "title": ["title"], "genre": ["genre"],
+               "all": ["movie_id", "title", "genre"]}
+    if field not in columns:
+        field = "all"
+    where = " OR ".join(f"{col} LIKE ?" for col in columns[field])
     with get_connection() as conn:
         return conn.execute(
-            "SELECT * FROM movies WHERE title LIKE ? OR genre LIKE ?", (like, like)
+            f"SELECT * FROM movies WHERE {where}", [like] * len(columns[field])
         ).fetchall()
 
 
@@ -145,6 +159,17 @@ def get_showtime(showtime_id):
         return conn.execute(
             "SELECT * FROM showtimes WHERE showtime_id = ?", (showtime_id,)
         ).fetchone()
+
+
+def update_showtime(s):
+    """s là object Showtime. Trả về True nếu có suất chiếu để sửa."""
+    with get_connection() as conn:
+        cur = conn.execute(
+            """UPDATE showtimes SET movie_id=?, room=?, show_date=?, show_time=?, ticket_price=?
+               WHERE showtime_id=?""",
+            (s.movie_id, s.room, s.show_date, s.show_time, s.ticket_price, s.showtime_id),
+        )
+        return cur.rowcount == 1
 
 
 def get_showtimes_in_room(room):
@@ -217,8 +242,14 @@ def create_booking(booking_id, showtime_id, customer_name, phone, booking_date, 
 
 
 def get_booking(booking_id):
+    """lấy 1 booking kèm phòng, giá vé, ngày giờ chiếu, tên phim (JOIN) + danh sách ghế"""
     with get_connection() as conn:
-        b = conn.execute("SELECT * FROM bookings WHERE booking_id = ?", (booking_id,)).fetchone()
+        b = conn.execute("""
+            SELECT b.*, s.room, s.ticket_price, s.show_date, s.show_time, m.title
+            FROM bookings b
+            JOIN showtimes s ON s.showtime_id = b.showtime_id
+            JOIN movies m    ON m.movie_id = s.movie_id
+            WHERE b.booking_id = ?""", (booking_id,)).fetchone()
         if b is None:
             return None, []
         seats = [r["seat_code"] for r in conn.execute(
@@ -229,7 +260,7 @@ def get_booking(booking_id):
 def get_all_bookings():
     with get_connection() as conn:
         return conn.execute("""
-            SELECT b.*, m.title, s.show_date, s.show_time
+            SELECT b.*, m.title, s.show_date, s.show_time, s.room, s.ticket_price
             FROM bookings b
             JOIN showtimes s ON s.showtime_id = b.showtime_id
             JOIN movies m    ON m.movie_id = s.movie_id

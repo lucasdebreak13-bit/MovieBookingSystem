@@ -21,8 +21,9 @@ class CinemaManager:
     def get_movies(self, sort_by='movie_id'):
         return db.get_all_movies(sort_by)
 
-    def search_movies(self, keyword):
-        return db.search_movies(keyword.strip())
+    def search_movies(self, keyword, field='all'):
+        """field: 'id' / 'title' / 'genre' / 'all'"""
+        return db.search_movies(keyword.strip(), field)
 
     def find_movie(self, movie_id):
         row = db.get_movie(movie_id.strip().upper())
@@ -84,11 +85,10 @@ class CinemaManager:
         end = start + timedelta(minutes=duration + CLEANING_MINUTES)
         return start, end
 
-    def add_showtime(self, showtime):
+    def _check_schedule(self, showtime, ignore_id=None):
+        """kiểm tra phim hợp lệ, không quá khứ, không trùng lịch phòng.
+        ignore_id: bỏ qua chính suất chiếu đang sửa khi so trùng lịch."""
         movie = self.find_movie_for_showtime(showtime.movie_id)
-        if db.get_showtime(showtime.showtime_id) is not None:
-            raise ValueError(f'Showtime ID {showtime.showtime_id} already exists')
-
         new_start, new_end = self._start_end(showtime.show_date, showtime.show_time,
                                              movie['duration'])
         # không tạo suất chiếu trong quá khứ
@@ -97,6 +97,8 @@ class CinemaManager:
 
         # không trùng lịch trong cùng phòng (tính cả thời lượng phim + dọn phòng)
         for other in db.get_showtimes_in_room(showtime.room):
+            if other['showtime_id'] == ignore_id:
+                continue
             old_start, old_end = self._start_end(other['show_date'], other['show_time'],
                                                  other['duration'])
             if new_start < old_end and old_start < new_end:   # 2 khoảng thời gian giao nhau
@@ -104,11 +106,38 @@ class CinemaManager:
                     f"Room {showtime.room} is busy: {other['showtime_id']} "
                     f"({other['title']}) runs {old_start:%Y-%m-%d %H:%M} - {old_end:%H:%M} "
                     f"(incl. {CLEANING_MINUTES} min cleaning)")
+
+    def add_showtime(self, showtime):
+        if db.get_showtime(showtime.showtime_id) is not None:
+            raise ValueError(f'Showtime ID {showtime.showtime_id} already exists')
+        self._check_schedule(showtime)
         try:
             db.add_showtime(showtime)
         except sqlite3.IntegrityError:
             raise ValueError(f'Room {showtime.room} already has a show at '
                              f'{showtime.show_date} {showtime.show_time}')
+
+    def find_showtime_for_update(self, showtime_id):
+        """suất chiếu phải tồn tại và CHƯA có người đặt thì mới được sửa,
+        vì đổi giờ/phòng/giá sẽ làm sai vé khách đã mua."""
+        st = self.get_showtime_object(showtime_id)
+        if db.get_booked_seats(st.showtime_id):
+            raise ValueError('Cannot update: this showtime already has bookings')
+        return st
+
+    def update_showtime(self, showtime):
+        """sửa suất chiếu (tuần 6)"""
+        self.find_showtime_for_update(showtime.showtime_id)
+        self._check_schedule(showtime, ignore_id=showtime.showtime_id)
+        db.update_showtime(showtime)
+
+    def get_showtime_object(self, showtime_id):
+        """tạo object Showtime đầy đủ: có tên phim và danh sách ghế khả dụng"""
+        st = self.find_showtime(showtime_id)
+        movie = db.get_movie(st['movie_id'])
+        return Showtime(st['showtime_id'], st['movie_id'], st['room'], st['show_date'],
+                        st['show_time'], st['ticket_price'], movie['title'],
+                        db.get_available_seats(st['showtime_id']))
 
     def delete_showtime(self, showtime_id):
         showtime_id = showtime_id.strip().upper()
@@ -143,13 +172,14 @@ class CinemaManager:
         """trả về (booking_id, total)."""
         st = self.find_showtime(showtime_id)
         booking = Booking(db.next_id('bookings', 'booking_id', 'B', 3),
-                          st['showtime_id'], customer_name, phone, seats)
+                          st['showtime_id'], customer_name, phone, seats,
+                          st['ticket_price'], st['room'], str(date.today()))
         taken = [s for s in booking.seats if s in db.get_booked_seats(st['showtime_id'])]
         if taken:
             raise ValueError(f'Seat(s) already booked: {", ".join(taken)}')
         total = db.create_booking(booking.booking_id, booking.showtime_id,
                                   booking.customer_name, booking.phone,
-                                  str(date.today()), booking.seats)
+                                  booking.booking_date, booking.seats)
         return booking.booking_id, total
 
     def get_booking(self, booking_id):
@@ -158,6 +188,15 @@ class CinemaManager:
             raise ValueError(f'Booking {booking_id} not found')
         return row, seats
 
+    def get_booking_object(self, booking_id):
+        """tạo object Booking đầy đủ: giá vé, số phòng, ngày đặt (tuần 5)"""
+        row, seats = self.get_booking(booking_id)
+        if not seats:                      # vé đã huỷ -> không còn ghế
+            return None
+        return Booking(row['booking_id'], row['showtime_id'], row['customer_name'],
+                       row['phone'], seats, row['ticket_price'], row['room'],
+                       row['booking_date'])
+
     def get_all_bookings(self):
         return db.get_all_bookings()
 
@@ -165,12 +204,43 @@ class CinemaManager:
         row, _ = self.get_booking(booking_id)
         # dùng booking để kiểm tra danh sách ghế mới hợp lệ
         checked = Booking(row['booking_id'], row['showtime_id'],
-                          row['customer_name'], row['phone'], new_seats)
+                          row['customer_name'], row['phone'], new_seats,
+                          row['ticket_price'], row['room'], row['booking_date'])
         return db.change_booking_seats(checked.booking_id, checked.seats)
 
     def cancel_booking(self, booking_id):
         if not db.cancel_booking(booking_id.strip().upper()):
             raise ValueError('Booking not found or already cancelled')
+
+    # =============================== SORT ==============================
+    # tuần 7: sắp xếp tăng dần hoặc giảm dần (descending=True)
+
+    MOVIE_SORT = {'title': lambda r: r['title'].lower(),
+                  'price': lambda r: r['ticket_price'],
+                  'duration': lambda r: r['duration'],
+                  'id': lambda r: r['movie_id']}
+    SHOWTIME_SORT = {'date': lambda r: (r['show_date'], r['show_time']),
+                     'title': lambda r: r['title'].lower(),
+                     'price': lambda r: r['ticket_price']}
+    BOOKING_SORT = {'date': lambda r: (r['booking_date'], r['booking_id']),
+                    'title': lambda r: r['title'].lower(),
+                    'total': lambda r: r['total_price'],
+                    'customer': lambda r: r['customer_name'].lower()}
+
+    @staticmethod
+    def _sort(rows, keys, by, descending):
+        if by not in keys:
+            raise ValueError(f'Cannot sort by {by}. Choose one of: {", ".join(keys)}')
+        return sorted(rows, key=keys[by], reverse=descending)
+
+    def sort_movies(self, by='title', descending=False):
+        return self._sort(db.get_all_movies(), self.MOVIE_SORT, by, descending)
+
+    def sort_showtimes(self, by='date', descending=False):
+        return self._sort(db.get_showtimes(), self.SHOWTIME_SORT, by, descending)
+
+    def sort_bookings(self, by='date', descending=False):
+        return self._sort(db.get_all_bookings(), self.BOOKING_SORT, by, descending)
 
     # ============================== REPORT =============================
 
@@ -184,6 +254,8 @@ class CinemaManager:
             các dòng sau: M01|Avatar 10|Sci-fi|192|T13|English|80000|2026|Now Showing
         mỗi dòng đi qua class Movie để kiểm tra trả về (added, skipped, errors)
         """
+        if not os.path.isabs(path):   # đường dẫn rút gọn -> tính từ thư mục project
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), path)
         if not os.path.exists(path):
             raise ValueError(f'File not found: {path}')
         added, skipped, errors = [], [], []
