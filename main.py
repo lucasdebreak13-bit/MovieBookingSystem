@@ -40,6 +40,21 @@ def input_float(prompt, default=None):
             print('  -> Please enter a number.')
 
 
+def input_choice(title, options):
+    """options: list (key, label). Trả về key được chọn, Enter = lựa chọn đầu tiên."""
+    print(title + '   ' + '   '.join(f'{i}. {label}' for i, (_, label) in enumerate(options, 1)))
+    while True:
+        value = input('Choose [1]: ').strip() or '1'
+        if value.isdigit() and 1 <= int(value) <= len(options):
+            return options[int(value) - 1][0]
+        print(f'  -> Please enter a number from 1 to {len(options)}.')
+
+
+def input_order():
+    """hỏi thứ tự sắp xếp, trả về True nếu giảm dần"""
+    return input_choice('Order:', [(False, 'Ascending'), (True, 'Descending')])
+
+
 def pause():
     input('\nPress Enter to continue...')
 
@@ -75,11 +90,13 @@ def print_bookings(rows):
     if not rows:
         print('  (no bookings)')
         return
-    print(f"{'ID':<6}{'Show':<6}{'Movie':<20}{'Customer':<16}{'Phone':<12}{'Total':>11}  {'Status'}")
-    print('-' * 82)
+    print(f"{'ID':<6}{'Show':<6}{'Movie':<20}{'Room':<6}{'Customer':<16}{'Phone':<12}"
+          f"{'Booked on':<12}{'Total':>11}  {'Status'}")
+    print('-' * 100)
     for r in rows:
-        print(f"{r['booking_id']:<6}{r['showtime_id']:<6}{r['title'][:19]:<20}"
-              f"{r['customer_name'][:15]:<16}{r['phone']:<12}{r['total_price']:>11,.0f}  {r['status']}")
+        print(f"{r['booking_id']:<6}{r['showtime_id']:<6}{r['title'][:19]:<20}{r['room']:<6}"
+              f"{r['customer_name'][:15]:<16}{r['phone']:<12}{r['booking_date']:<12}"
+              f"{r['total_price']:>11,.0f}  {r['status']}")
 
 
 # ============================== MOVIE MENU =============================
@@ -88,8 +105,8 @@ def menu_movie():
     while True:
         print('\n========== MOVIES ==========')
         print('1. View all movies')
-        print('2. Sort movies (by price / duration / title)')
-        print('3. Search by title or genre')
+        print('2. Sort movies (by title / price / duration, ascending or descending)')
+        print('3. Search movies (by ID / title / genre)')
         print('4. Add movie')
         print('5. Update movie')
         print('6. Delete movie')
@@ -99,12 +116,13 @@ def menu_movie():
             if choice == '1':
                 print_movies(manager.get_movies())
             elif choice == '2':
-                print('a. Ticket price   b. Duration   c. Title')
-                key = {'a': 'ticket_price', 'b': 'duration', 'c': 'title'}.get(
-                    input('Sort by: ').strip().lower(), 'movie_id')
-                print_movies(manager.get_movies(key))
+                by = input_choice('Sort by:', [('title', 'Title'), ('price', 'Ticket price'),
+                                               ('duration', 'Duration')])
+                print_movies(manager.sort_movies(by, input_order()))
             elif choice == '3':
-                print_movies(manager.search_movies(input_text('Keyword')))
+                field = input_choice('Search by:', [('all', 'ID / Title / Genre'), ('id', 'Movie ID'),
+                                                    ('title', 'Title'), ('genre', 'Genre')])
+                print_movies(manager.search_movies(input_text('Keyword'), field))
             elif choice == '4':
                 add_movie()
             elif choice == '5':
@@ -169,6 +187,8 @@ def menu_showtime():
         print('3. View seat map')
         print('4. Add showtime')
         print('5. Delete showtime')
+        print('6. Update showtime')
+        print('7. Sort showtimes (by date / title / price, ascending or descending)')
         print('0. Back')
         choice = input('Choose: ').strip()
         try:
@@ -183,6 +203,12 @@ def menu_showtime():
             elif choice == '5':
                 manager.delete_showtime(input_text('Showtime ID to delete'))
                 print('Deleted!')
+            elif choice == '6':
+                update_showtime()
+            elif choice == '7':
+                by = input_choice('Sort by:', [('date', 'Date & time'), ('title', 'Movie title'),
+                                               ('price', 'Ticket price')])
+                print_showtimes(manager.sort_showtimes(by, input_order()))
             elif choice == '0':
                 return
             else:
@@ -214,6 +240,24 @@ def add_showtime():
     print('Added:', showtime)
 
 
+def update_showtime():
+    old = manager.find_showtime_for_update(input_text('Showtime ID to update'))
+    print('Current:', old)
+    print('(Press Enter to keep the current value)')
+    movie = manager.find_movie_for_showtime(input_text('Movie ID', old.movie_id))
+    showtime = Showtime(
+        old.showtime_id,
+        movie['movie_id'],
+        input_text('Room (e.g. R1)', old.room),
+        input_text('Date (YYYY-MM-DD)', old.show_date),
+        input_text('Time (HH:MM)', old.show_time),
+        input_float('Ticket price (VND)', old.ticket_price),
+        movie['title'],
+    )
+    manager.update_showtime(showtime)
+    print('Updated:', manager.get_showtime_object(showtime.showtime_id))
+
+
 # ============================= BOOKING MENU ============================
 
 def menu_booking():
@@ -224,6 +268,7 @@ def menu_booking():
         print('3. View all bookings')
         print('4. Change seats / number of tickets')
         print('5. Cancel booking')
+        print('6. Sort bookings (by date / movie / total / customer, ascending or descending)')
         print('0. Back')
         choice = input('Choose: ').strip()
         try:
@@ -240,6 +285,10 @@ def menu_booking():
                 if input(f'Cancel {booking_id}? (y/n): ').strip().lower() == 'y':
                     manager.cancel_booking(booking_id)
                     print('Cancelled! Seats are free again.')
+            elif choice == '6':
+                by = input_choice('Sort by:', [('date', 'Booking date'), ('title', 'Movie title'),
+                                               ('total', 'Total price'), ('customer', 'Customer name')])
+                print_bookings(manager.sort_bookings(by, input_order()))
             elif choice == '0':
                 return
             else:
@@ -263,13 +312,16 @@ def book_tickets():
 
 def view_booking(booking_id):
     row, seats = manager.get_booking(booking_id)
-    print(f"Booking ID : {row['booking_id']}")
-    print(f"Showtime   : {row['showtime_id']}")
-    print(f"Customer   : {row['customer_name']} ({row['phone']})")
-    print(f"Booked on  : {row['booking_date']}")
-    print(f"Seats      : {', '.join(seats) if seats else '-'}")
-    print(f"Total      : {row['total_price']:,.0f} VND")
-    print(f"Status     : {row['status']}")
+    print(f"Booking ID  : {row['booking_id']}")
+    print(f"Movie       : {row['title']}")
+    print(f"Showtime    : {row['showtime_id']} - {row['show_date']} {row['show_time']}")
+    print(f"Room        : {row['room']}")
+    print(f"Customer    : {row['customer_name']} ({row['phone']})")
+    print(f"Booked on   : {row['booking_date']}")
+    print(f"Seats       : {', '.join(seats) if seats else '-'}")
+    print(f"Ticket price: {row['ticket_price']:,.0f} VND")
+    print(f"Total       : {row['total_price']:,.0f} VND")
+    print(f"Status      : {row['status']}")
 
 
 def change_seats():

@@ -2,7 +2,7 @@
 
 A console-based movie ticket booking management system developed in **Python** for the **PFP191 – Programming Fundamentals with Python** course.
 
-> **Project status:** In development. The features and project structure below describe our team's planned work; not all modules are finished yet.
+> **Project status:** Completed for Week 7 – all planned features (Weeks 4–7) are implemented and tested.
 
 ## 1. Project objectives
 
@@ -14,32 +14,34 @@ This project helps users manage movie information, screening schedules, and tick
 - Reading and writing text files
 - Modular programming and teamwork using GitHub
 
-## 2. Planned features
+## 2. Features
 
-### Movie
-- Create and display movie objects
-- Add, update, and delete movies
-- Search movies by title and genre
-- Sort movies by ticket price and duration
-- Validate movie information
+### Movie (Week 5)
+- `Movie` class: movie ID, title, genre, age rating, duration, language, ticket price, release year, status
+- Add, update and delete movies (a movie that still has showtimes cannot be deleted)
+- **Search** by movie ID, title or genre
+- **Sort** by title, ticket price or duration – ascending or descending
+- Import movies from a text file (`movies.txt`)
 
-The required movie fields are `movie_id`, `title`, `genre`, `duration`, and `ticket_price`. Our team may also include extra fields such as `age_rating`, `language`, `release_year`, and `status`.
+### Showtime (Week 5)
+- `Showtime` class: showtime ID, movie (ID + title), room, date, time, ticket price, available seats
+- Add, **update** and delete showtimes (a showtime that already has bookings cannot be updated or deleted)
+- Prevent schedule conflicts in the same room (movie duration + 15 minutes cleaning)
+- Prevent creating showtimes in the past
+- Seat map (5 rows × 10 seats) showing booked seats
+- **Sort** by date & time, movie title or ticket price – ascending or descending
 
-### Showtime
-- Create and manage showtimes for movies
-- Store screening date, time, ticket price, and available seats
-- Search and sort showtimes
+### Booking / Ticket purchase (Week 5)
+- `Booking` class: booking ID, showtime, customer name, phone, seats, ticket price, room number, booking date
+- Book tickets, prevent double-booking of a seat
+- Update a booking (change seats / number of tickets) and cancel a booking (seats are released)
+- **Sort** bookings by booking date, movie title, total price or customer name – ascending or descending
 
-### Booking
-- Book tickets for a selected showtime
-- Change the number of tickets in a booking
-- Cancel a booking and restore the available seats
-- View booking information
-
-### Management
-- Provide a text-based menu
-- Connect Movie, Showtime, and Booking modules
-- Save and load data from text files
+### Management (Weeks 6–7)
+- `CinemaManager` connects all modules: add / update / delete for Movie, Showtime and Booking
+- Text-based menu (`main.py`)
+- **Save and load data:** SQLite database (`data/cinema.db`), export all data to text files, import movies from a text file
+- Revenue report by movie
 
 ## 3. Technologies
 
@@ -63,6 +65,8 @@ MovieBookingSystem/
 ├── data/            # Created automatically (ignored by Git)
 │   ├── cinema.db
 │   └── movies.txt, showtimes.txt, bookings.txt   (after export)
+├── docs/
+│   └── MovieBooking_UML.png
 ├── README.md
 └── .gitignore
 ```
@@ -85,14 +89,21 @@ Each class file (`movie.py`, `showtime.py`, `booking.py`) can also be run alone 
 
 ## 6. Team responsibilities
 
-| Member | Module | Main responsibilities |
-|---|---|---|
-| Member 1 | Movie | Movie class, movie information and validation |
-| Member 2 | Showtime | Screening schedules and available seats |
-| Member 3 | Booking | Booking, changes and cancellation |
-| Member 4 | Management | Main menu, module integration and overall data management |
+| Role | Member | Module | Main responsibilities |
+|---|---|---|---|
+| A – Movie Data | Trần Đăng Khoa | `movie.py` | Movie class, movie information and validation |
+| B – Showtime | Nguyễn Trần Nhật Anh | `showtime.py` | Showtime class, schedule, available seats |
+| C – Ticket | Võ Nguyễn Khôi Nguyên | `booking.py` | Booking class, booking, change and cancellation |
+| D – Management | Lê Nguyên | `management.py`, `main.py` | Module integration, menu, data management (Weeks 6–7 supported by all members) |
 
-The team will agree on how to divide shared features such as movie search, sorting, and file handling before implementing them.
+### Weekly plan
+
+| Week | Goal | Result |
+|---|---|---|
+| 4 | UML class diagram | `docs/MovieBooking_UML.png` |
+| 5 | Main classes: Movie, Showtime, Booking | `movie.py`, `showtime.py`, `booking.py` |
+| 6 | `CinemaManager`: integrate modules; add / delete / update for Movie, Showtime, Booking | `management.py`, `main.py`, `database.py` |
+| 7 | Search (ID, title, genre); sort (title, date, purchase) ascending / descending; save and load data | Search & sort menus, SQLite + text export/import |
 
 ## 7. How we collaborate
 
@@ -104,13 +115,14 @@ The team will agree on how to divide shared features such as movie search, sorti
 
 ## 8. Testing
 
-The team plans to test valid and invalid inputs, movie and showtime data, booking seat counts, and file saving/loading. Integration testing will be completed before submission.
+Each class file (`movie.py`, `showtime.py`, `booking.py`) contains its own tests inside `if __name__ == "__main__":`.
+Manual test cases cover valid and invalid inputs for movies, showtimes and bookings, room schedule conflicts, past showtimes, updating showtimes, seat conflicts, booking changes and cancellation, search and sort (ascending / descending), the revenue report, and exporting/importing text files.
 
-## 9. Course information
-## Coding conventions
+## 9. Coding conventions
+
 | Item | Rule | Example |
 |---|---|---|
-| Language | All names, messages and comments in English | `calculate_total()` |
+| Language | Names and messages in English; comments may be in Vietnamese | `calculate_total()` |
 | Class names | PascalCase | `Movie`, `Showtime`, `Booking`, `CinemaManager` |
 | Functions / variables | snake_case | `get_available_seats()`, `ticket_price` |
 | Movie ID | `M` + 2 digits | `M01` |
@@ -123,8 +135,11 @@ The team plans to test valid and invalid inputs, movie and showtime data, bookin
 | Money | VND, stored as `float`, displayed with commas | `80,000 VND` |
 | Errors | Classes `raise ValueError`; only `main.py` / `management.py` use `try/except` | |
 | Test code | Put inside `if __name__ == "__main__":` | |
+
+## 10. Course information
+
 - **Course:** PFP191 – Programming Fundamentals with Python
-- **Project topic:** Movie Ticket Booking Management System
+- **Project topic:** Topic 9 – Movie Ticket Purchase Management
 - **Type:** Group assignment (4 members)
 
-This repository is for learning and coursework. AI assistance, if used, should be recorded in the course's AI Audit Log as required.
+This repository is for learning and coursework. AI assistance is recorded in each member's AI Audit Log as required by the course.
